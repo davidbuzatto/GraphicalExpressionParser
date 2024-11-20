@@ -1,5 +1,6 @@
 package gep;
 
+import br.com.davidbuzatto.jsge.core.engine.EngineFrame;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +26,8 @@ import java.util.List;
 public class ExpressionParser {
     
     private class Expression {
+        int rank;
+        int level;
     }
     
     private class BinaryExpression extends Expression {
@@ -90,7 +93,7 @@ public class ExpressionParser {
         return new ExpressionParser( expression ).toString();
     }
     
-    private ExpressionParser( String expression ) {
+    public ExpressionParser( String expression ) {
         this.tokens = getTokens( expression );
         resultExpression = parseExpression();
     }
@@ -269,6 +272,84 @@ public class ExpressionParser {
             sb.append( "\n" ).append( spacing ).append( line ).append( "(" ).append( m.operator.value ).append( ")" );
             printToBuilder( m.op1, sb, level + 1 );
             printToBuilder( m.op2, sb, level + 1 );
+        }
+        
+    }
+    
+    private int currentRank;
+    
+    public void draw( EngineFrame ef, int x, int y, int spacing, int radius ) {
+        currentRank = 0;
+        calculateRanksAndLevels( resultExpression, 0 );
+        drawEdges( ef, resultExpression, x, y, spacing, radius );
+        drawNodes( ef, resultExpression, x, y, spacing, radius );
+    }
+    
+    private void calculateRanksAndLevels( Expression e, int level ) {
+        
+        if ( e instanceof ConstValue c ) {
+            c.rank = currentRank++;
+            c.level = level;
+        } else if ( e instanceof AddingExpression a ) {
+            calculateRanksAndLevels( a.op1, level + 1 );
+            a.rank = currentRank++;
+            a.level = level;
+            calculateRanksAndLevels( a.op2, level + 1 );
+        } else if ( e instanceof MultiplyingExpression m ) {
+            calculateRanksAndLevels( m.op1, level + 1 );
+            m.rank = currentRank++;
+            m.level = level;
+            calculateRanksAndLevels( m.op2, level + 1 );
+        }
+        
+    }
+    
+    private void drawNodes( EngineFrame ef, Expression e, int x, int y, int spacing, int radius ) {
+        
+        ef.fillCircle( x + e.rank * spacing, y + e.level * spacing, radius, EngineFrame.WHITE );
+        ef.drawCircle( x + e.rank * spacing, y + e.level * spacing, radius, EngineFrame.BLACK );
+        
+        if ( e instanceof ConstValue c ) {
+            int w = ef.measureText( c.value, 20 );
+            ef.drawText( c.value, x + c.rank * spacing - w / 2 + 2, y + c.level * spacing - 5, 20, EngineFrame.BLACK );
+        } else if ( e instanceof AddingExpression a ) {
+            int w = ef.measureText( a.operator.value, 20 );
+            ef.drawText( a.operator.value, x + a.rank * spacing - w / 2 + 2, y + a.level * spacing - 5, 20, EngineFrame.BLACK );
+            drawNodes( ef, a.op1, x, y, spacing, radius );
+            drawNodes( ef, a.op2, x, y, spacing, radius );
+        } else if ( e instanceof MultiplyingExpression m ) {
+            int w = ef.measureText( m.operator.value, 20 );
+            ef.drawText( m.operator.value, x + m.rank * spacing - w / 2 + 2, y + m.level * spacing - 5, 20, EngineFrame.BLACK );
+            drawNodes( ef, m.op1, x, y, spacing, radius );
+            drawNodes( ef, m.op2, x, y, spacing, radius );
+        }
+        
+    }
+    
+    private void drawEdges( EngineFrame ef, Expression e, int x, int y, int spacing, int radius ) {
+        
+        if ( e instanceof AddingExpression a ) {
+            double x1 = x + a.rank * spacing;
+            double y1 = y + a.level * spacing;
+            double x2 = x + a.op1.rank * spacing;
+            double y2 = y + a.op1.level * spacing;
+            double x3 = x + a.op2.rank * spacing;
+            double y3 = y + a.op2.level * spacing;
+            ef.drawLine( x1, y1, x2, y2, EngineFrame.BLACK );
+            ef.drawLine( x1, y1, x3, y3, EngineFrame.BLACK );
+            drawEdges( ef, a.op1, x, y, spacing, radius );
+            drawEdges( ef, a.op2, x, y, spacing, radius );
+        } else if ( e instanceof MultiplyingExpression m ) {
+            double x1 = x + m.rank * spacing;
+            double y1 = y + m.level * spacing;
+            double x2 = x + m.op1.rank * spacing;
+            double y2 = y + m.op1.level * spacing;
+            double x3 = x + m.op2.rank * spacing;
+            double y3 = y + m.op2.level * spacing;
+            ef.drawLine( x1, y1, x2, y2, EngineFrame.BLACK );
+            ef.drawLine( x1, y1, x3, y3, EngineFrame.BLACK );
+            drawEdges( ef, m.op1, x, y, spacing, radius );
+            drawEdges( ef, m.op2, x, y, spacing, radius );
         }
         
     }
